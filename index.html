@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Todo App</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+      display: flex;
+      justify-content: center;
+      padding: 40px 16px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+    h1 { text-align: center; margin-bottom: 20px; color: #333; }
+    .input-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .input-row input {
+      flex: 1;
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 16px;
+    }
+    .input-row button {
+      padding: 10px 20px;
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .input-row button:hover { background: #43a047; }
+    ul { list-style: none; }
+    li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      border-bottom: 1px solid #eee;
+    }
+    li:last-child { border-bottom: none; }
+    li span { word-break: break-word; }
+    li button {
+      background: #e53935;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 6px 12px;
+      cursor: pointer;
+      flex-shrink: 0;
+      margin-left: 12px;
+    }
+    li button:hover { background: #c62828; }
+    .empty { text-align: center; color: #999; padding: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Todo App</h1>
+    <div class="input-row">
+      <input type="text" id="todoInput" placeholder="Add a new todo…">
+      <button id="addBtn">Add</button>
+    </div>
+    <ul id="todoList"></ul>
+  </div>
+
+  <script>
+    const input = document.getElementById('todoInput');
+    const addBtn = document.getElementById('addBtn');
+    const list = document.getElementById('todoList');
+
+    function addTodo() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      const li = document.createElement('li');
+
+      const span = document.createElement('span');
+      span.textContent = text;
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', () => li.remove());
+
+      li.appendChild(span);
+      li.appendChild(deleteBtn);
+      list.appendChild(li);
+
+      input.value = '';
+      input.focus();
+    }
+
+    addBtn.addEventListener('click', addTodo);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addTodo();
+    });
+  </script>
+</body>
+</html>
