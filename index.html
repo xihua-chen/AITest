@@ -13,6 +13,8 @@
       justify-content: center;
       padding: 40px 16px;
     }
+
+    /* ── Shared container ── */
     .container {
       background: #fff;
       border-radius: 8px;
@@ -22,6 +24,102 @@
       max-width: 480px;
     }
     h1 { text-align: center; margin-bottom: 20px; color: #333; }
+
+    /* ── Auth screens ── */
+    #authSection .tab-row {
+      display: flex;
+      margin-bottom: 20px;
+      border-bottom: 2px solid #eee;
+    }
+    #authSection .tab-row button {
+      flex: 1;
+      padding: 10px;
+      background: none;
+      border: none;
+      font-size: 15px;
+      cursor: pointer;
+      color: #888;
+    }
+    #authSection .tab-row button.active {
+      color: #4caf50;
+      border-bottom: 2px solid #4caf50;
+      font-weight: bold;
+    }
+    .auth-form { display: flex; flex-direction: column; gap: 12px; }
+    .auth-form input {
+      padding: 10px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 15px;
+    }
+    .auth-form button[type="submit"] {
+      padding: 10px;
+      background: #4caf50;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 15px;
+      cursor: pointer;
+    }
+    .auth-form button[type="submit"]:hover { background: #43a047; }
+    .oauth-divider {
+      text-align: center;
+      color: #aaa;
+      font-size: 13px;
+      position: relative;
+    }
+    .oauth-divider::before,
+    .oauth-divider::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      width: 40%;
+      height: 1px;
+      background: #eee;
+    }
+    .oauth-divider::before { left: 0; }
+    .oauth-divider::after { right: 0; }
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background: #fff;
+      font-size: 14px;
+      cursor: pointer;
+    }
+    .oauth-btn:hover { background: #f9f9f9; }
+    .oauth-btn .icon { font-size: 18px; }
+    .error-msg {
+      color: #e53935;
+      font-size: 13px;
+      text-align: center;
+      min-height: 18px;
+    }
+
+    /* ── Todo app ── */
+    #appSection { display: none; }
+    .app-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .app-header h1 { margin-bottom: 0; }
+    .user-info { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #555; }
+    .logout-btn {
+      padding: 6px 12px;
+      background: #e53935;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .logout-btn:hover { background: #c62828; }
     .input-row {
       display: flex;
       gap: 8px;
@@ -69,8 +167,50 @@
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <!-- ── Authentication Section ── -->
+  <div id="authSection" class="container">
     <h1>Todo App</h1>
+
+    <div class="tab-row">
+      <button id="loginTab" class="active" onclick="showTab('login')">Login</button>
+      <button id="registerTab" onclick="showTab('register')">Register</button>
+    </div>
+
+    <!-- Login form -->
+    <form id="loginForm" class="auth-form" onsubmit="handleLogin(event)">
+      <input id="loginUsername" type="text" placeholder="Username" required autocomplete="username">
+      <input id="loginPassword" type="password" placeholder="Password" required autocomplete="current-password">
+      <p id="loginError" class="error-msg"></p>
+      <button type="submit">Login</button>
+      <div class="oauth-divider">or continue with</div>
+      <button type="button" class="oauth-btn" onclick="handleOAuth('Google')">
+        <span class="icon">&#9654;</span> Continue with Google
+      </button>
+      <button type="button" class="oauth-btn" onclick="handleOAuth('GitHub')">
+        <span class="icon">&#9670;</span> Continue with GitHub
+      </button>
+    </form>
+
+    <!-- Register form (hidden by default) -->
+    <form id="registerForm" class="auth-form" style="display:none;" onsubmit="handleRegister(event)">
+      <input id="regUsername" type="text" placeholder="Choose a username" required autocomplete="username">
+      <input id="regPassword" type="password" placeholder="Choose a password" required autocomplete="new-password">
+      <input id="regPassword2" type="password" placeholder="Confirm password" required autocomplete="new-password">
+      <p id="registerError" class="error-msg"></p>
+      <button type="submit">Create Account</button>
+    </form>
+  </div>
+
+  <!-- ── Todo App Section ── -->
+  <div id="appSection" class="container">
+    <div class="app-header">
+      <h1>My Todos</h1>
+      <div class="user-info">
+        <span id="currentUserLabel"></span>
+        <button class="logout-btn" onclick="handleLogout()">Logout</button>
+      </div>
+    </div>
     <div class="input-row">
       <input type="text" id="todoInput" placeholder="Add a new todo…">
       <button id="addBtn">Add</button>
@@ -79,35 +219,224 @@
   </div>
 
   <script>
-    const input = document.getElementById('todoInput');
-    const addBtn = document.getElementById('addBtn');
-    const list = document.getElementById('todoList');
+    /* ─────────────────────────────────────────────
+       ⚠️  DEMO ONLY — NOT FOR PRODUCTION USE ⚠️
+       This module simulates JWT-style token signing
+       entirely in the browser for illustration
+       purposes.  It does NOT use real HMAC-SHA256.
+       In a production app, tokens must be issued
+       and verified by a trusted backend server, and
+       the secret must never appear in client code.
+    ───────────────────────────────────────────── */
+    const JWT = (() => {
+      function b64url(str) {
+        return btoa(unescape(encodeURIComponent(str)))
+          .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      }
+      function b64urlDecode(str) {
+        str = str.replace(/-/g, '+').replace(/_/g, '/');
+        while (str.length % 4) str += '=';
+        return decodeURIComponent(escape(atob(str)));
+      }
+      function sign(payload, secret) {
+        // Header uses 'DEMO' to make clear this is not a real HS256 signature
+        const header  = b64url(JSON.stringify({ alg: 'DEMO', typ: 'JWT' }));
+        const body    = b64url(JSON.stringify(payload));
+        // Simulated signature — not cryptographically secure
+        const sig     = b64url(secret + '.' + header + '.' + body);
+        return header + '.' + body + '.' + sig;
+      }
+      function verify(token, secret) {
+        try {
+          const [header, body, sig] = token.split('.');
+          if (b64url(secret + '.' + header + '.' + body) !== sig) return null;
+          const payload = JSON.parse(b64urlDecode(body));
+          if (payload.exp && Date.now() / 1000 > payload.exp) return null;
+          return payload;
+        } catch (_) { return null; }
+      }
+      return { sign, verify };
+    })();
 
-    function addTodo() {
-      const text = input.value.trim();
-      if (!text) return;
+    // ⚠️ DEMO ONLY: secrets must never be embedded in client-side code in production.
+    const SECRET    = 'todo-app-demo-secret';
+    const TOKEN_KEY = 'todo_auth_token';
+    const USERS_KEY = 'todo_users';
 
-      const li = document.createElement('li');
+    /* ── User store (localStorage) ── */
+    function getUsers() {
+      return JSON.parse(localStorage.getItem(USERS_KEY) || '{}');
+    }
+    function saveUser(username, passwordHash) {
+      const users = getUsers();
+      users[username] = passwordHash;
+      localStorage.setItem(USERS_KEY, JSON.stringify(users));
+    }
+    /* ⚠️ DEMO ONLY: FNV-1a hash — not suitable for real password storage.
+       Use a proper backend with bcrypt/argon2 in production. */
+    function simpleHash(str) {
+      let h = 0x811c9dc5;
+      for (let i = 0; i < str.length; i++) {
+        h ^= str.charCodeAt(i);
+        h = (h * 0x01000193) >>> 0;
+      }
+      return h.toString(16);
+    }
 
-      const span = document.createElement('span');
+    /* ── Per-user todo storage ── */
+    function todosKey(username) { return 'todos_' + username; }
+    function getTodos(username) {
+      return JSON.parse(localStorage.getItem(todosKey(username)) || '[]');
+    }
+    function saveTodos(username, items) {
+      localStorage.setItem(todosKey(username), JSON.stringify(items));
+    }
+
+    /* ── Token helpers ── */
+    function issueToken(username) {
+      const now = Math.floor(Date.now() / 1000);
+      const payload = { sub: username, iat: now, exp: now + 3600 };
+      const token = JWT.sign(payload, SECRET);
+      localStorage.setItem(TOKEN_KEY, token);
+      return payload;
+    }
+    function getSession() {
+      const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) return null;
+      return JWT.verify(token, SECRET);
+    }
+    function clearSession() {
+      localStorage.removeItem(TOKEN_KEY);
+    }
+
+    /* ── Tab switching ── */
+    function showTab(tab) {
+      document.getElementById('loginForm').style.display    = tab === 'login'    ? '' : 'none';
+      document.getElementById('registerForm').style.display = tab === 'register' ? '' : 'none';
+      document.getElementById('loginTab').classList.toggle('active',    tab === 'login');
+      document.getElementById('registerTab').classList.toggle('active', tab === 'register');
+      document.getElementById('loginError').textContent    = '';
+      document.getElementById('registerError').textContent = '';
+    }
+
+    /* ── Auth handlers ── */
+    function handleLogin(e) {
+      e.preventDefault();
+      const username = document.getElementById('loginUsername').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const users    = getUsers();
+      if (!users[username] || users[username] !== simpleHash(password)) {
+        document.getElementById('loginError').textContent = 'Invalid username or password.';
+        return;
+      }
+      issueToken(username);
+      showApp(username);
+    }
+
+    function handleRegister(e) {
+      e.preventDefault();
+      const username  = document.getElementById('regUsername').value.trim();
+      const password  = document.getElementById('regPassword').value;
+      const password2 = document.getElementById('regPassword2').value;
+      if (password !== password2) {
+        document.getElementById('registerError').textContent = 'Passwords do not match.';
+        return;
+      }
+      if (password.length < 6) {
+        document.getElementById('registerError').textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+      const users = getUsers();
+      if (users[username]) {
+        document.getElementById('registerError').textContent = 'Username already taken.';
+        return;
+      }
+      saveUser(username, simpleHash(password));
+      issueToken(username);
+      showApp(username);
+    }
+
+    function handleOAuth(provider) {
+      /* ⚠️ DEMO ONLY: In a real app this redirects to the provider's OAuth2
+         authorization endpoint and exchanges a code for tokens server-side.
+         Here we simply simulate a successful login for UI demonstration. */
+      const username = provider + '_user';
+      const users    = getUsers();
+      if (!users[username]) saveUser(username, simpleHash(provider + '_oauth'));
+      issueToken(username);
+      showApp(username);
+    }
+
+    function handleLogout() {
+      clearSession();
+      currentUser = null;
+      document.getElementById('todoList').innerHTML = '';
+      document.getElementById('appSection').style.display  = 'none';
+      document.getElementById('authSection').style.display = '';
+    }
+
+    /* ── App view ── */
+    let currentUser = null;
+
+    function showApp(username) {
+      currentUser = username;
+      document.getElementById('authSection').style.display = 'none';
+      document.getElementById('appSection').style.display  = '';
+      document.getElementById('currentUserLabel').textContent = username;
+      loadTodos();
+    }
+
+    /* ── Todo logic ── */
+    function renderTodo(text) {
+      const list      = document.getElementById('todoList');
+      const li        = document.createElement('li');
+      const span      = document.createElement('span');
       span.textContent = text;
-
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = 'Delete';
-      deleteBtn.addEventListener('click', () => li.remove());
-
+      deleteBtn.addEventListener('click', () => {
+        li.remove();
+        persistTodos();
+      });
       li.appendChild(span);
       li.appendChild(deleteBtn);
       list.appendChild(li);
+    }
 
+    function loadTodos() {
+      const list = document.getElementById('todoList');
+      list.innerHTML = '';
+      getTodos(currentUser).forEach(text => renderTodo(text));
+    }
+
+    function persistTodos() {
+      const items = Array.from(document.getElementById('todoList').querySelectorAll('li span'))
+        .map(s => s.textContent);
+      saveTodos(currentUser, items);
+    }
+
+    function addTodo() {
+      const input = document.getElementById('todoInput');
+      const text  = input.value.trim();
+      if (!text) return;
+      renderTodo(text);
+      persistTodos();
       input.value = '';
       input.focus();
     }
 
-    addBtn.addEventListener('click', addTodo);
-    input.addEventListener('keydown', (e) => {
+    document.getElementById('addBtn').addEventListener('click', addTodo);
+    document.getElementById('todoInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addTodo();
     });
+
+    /* ── Bootstrap: restore session ── */
+    (function init() {
+      const session = getSession();
+      if (session) {
+        showApp(session.sub);
+      }
+    })();
   </script>
 </body>
 </html>
