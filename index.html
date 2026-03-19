@@ -23,8 +23,145 @@
       padding: 32px 28px 24px;
       width: 100%;
       max-width: 480px;
+      align-self: flex-start;
     }
     h1 { text-align: center; margin-bottom: 20px; color: #333; }
+
+    /* ── Auth (Login) panel ── */
+    #authPanel { display: block; }
+    .auth-logo {
+      text-align: center;
+      font-size: 48px;
+      margin-bottom: 8px;
+    }
+    .auth-subtitle {
+      text-align: center;
+      color: #888;
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+    .auth-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+      color: #bbb;
+      font-size: 13px;
+    }
+    .auth-divider::before,
+    .auth-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: #e8e8e8;
+    }
+    .form-group {
+      margin-bottom: 14px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      color: #555;
+      margin-bottom: 5px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid #d0d5dd;
+      border-radius: 8px;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus { border-color: #4f46e5; }
+    .auth-error {
+      color: #e53935;
+      font-size: 13px;
+      margin-bottom: 10px;
+      min-height: 18px;
+    }
+    .btn-primary {
+      width: 100%;
+      padding: 11px;
+      background: #4f46e5;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 4px;
+    }
+    .btn-primary:hover { background: #4338ca; }
+
+    /* OAuth2 provider buttons */
+    .oauth-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 100%;
+      padding: 11px;
+      border: 1.5px solid #d0d5dd;
+      border-radius: 8px;
+      font-size: 15px;
+      cursor: pointer;
+      background: #fff;
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 10px;
+    }
+    .oauth-btn:hover { background: #f5f5f5; border-color: #bbb; }
+    .oauth-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── Todo panel ── */
+    #todoPanel { display: none; }
+    .user-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .user-bar .user-info {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #4f46e5, #7c3aed);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .user-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+    }
+    .user-badge {
+      font-size: 11px;
+      color: #888;
+    }
+    .btn-logout {
+      padding: 7px 16px;
+      background: transparent;
+      color: #e53935;
+      border: 1.5px solid #e53935;
+      border-radius: 8px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-logout:hover { background: #e53935; color: #fff; }
+
     .input-row {
       display: flex;
       gap: 8px;
@@ -94,35 +231,271 @@
       color: #999;
       margin-top: 8px;
     }
+    .token-info {
+      background: #f5f3ff;
+      border: 1px solid #ede9fe;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: #6d28d9;
+      margin-top: 16px;
+      word-break: break-all;
+      line-height: 1.6;
+    }
+    .token-info strong { display: block; margin-bottom: 3px; color: #4f46e5; }
   </style>
 </head>
 <body>
-  <div class="container">
+
+  <!-- ── Login / Auth Panel ── -->
+  <div class="container" id="authPanel">
+    <div class="auth-logo">✅</div>
     <h1>Todo App</h1>
+    <p class="auth-subtitle">Sign in to manage your todos</p>
+
+    <!-- OAuth2 Providers -->
+    <button class="oauth-btn" id="googleBtn" onclick="oauthLogin('google')">
+      <!-- Google icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <button class="oauth-btn" id="githubBtn" onclick="oauthLogin('github')">
+      <!-- GitHub icon -->
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z" fill="#24292e"/>
+      </svg>
+      Continue with GitHub
+    </button>
+
+    <div class="auth-divider">or sign in with email</div>
+
+    <!-- Email / Password form -->
+    <form id="loginForm" onsubmit="emailLogin(event)">
+      <div class="form-group">
+        <label for="emailInput">Email</label>
+        <input type="email" id="emailInput" placeholder="you@example.com" required autocomplete="username">
+      </div>
+      <div class="form-group">
+        <label for="passwordInput">Password</label>
+        <input type="password" id="passwordInput" placeholder="••••••••" required autocomplete="current-password">
+      </div>
+      <div class="auth-error" id="authError"></div>
+      <button type="submit" class="btn-primary">Sign In</button>
+    </form>
+  </div>
+
+  <!-- ── Todo Panel (shown after login) ── -->
+  <div class="container" id="todoPanel">
+    <!-- User bar -->
+    <div class="user-bar">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar"></div>
+        <div>
+          <div class="user-name" id="userName"></div>
+          <div class="user-badge" id="userBadge"></div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sign Out</button>
+    </div>
+
+    <h1>My Todos</h1>
     <div class="input-row">
       <input type="text" id="todoInput" placeholder="Add a new todo…">
       <button id="addBtn">Add</button>
     </div>
     <ul id="todoList"></ul>
+    <div class="counter" id="counter"></div>
+
+    <!-- JWT token display -->
+    <div class="token-info" id="tokenInfo"></div>
   </div>
 
   <script>
-    const input = document.getElementById('todoInput');
-    const addBtn = document.getElementById('addBtn');
-    const list = document.getElementById('todoList');
+    // ── Minimal JWT helpers (client-side DEMO only – NOT for production use) ──
+    // WARNING: This JWT implementation is for UI demonstration purposes only.
+    // The "signature" is not cryptographically secure. In a real application,
+    // tokens must be issued and verified by a trusted server using a secret key.
+
+    /** Returns the current Unix timestamp (seconds). */
+    function nowUnix() {
+      return Math.floor(Date.now() / 1000);
+    }
+
+    /**
+     * Base64url-encode a UTF-8 string using TextEncoder (no deprecated escape()).
+     */
+    function base64url(str) {
+      const bytes = new TextEncoder().encode(str);
+      let binary = '';
+      bytes.forEach(b => { binary += String.fromCharCode(b); });
+      return btoa(binary)
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    /**
+     * Create a demo JWT token.
+     * In a real app the server signs the token with a secret; here we use a
+     * random nonce per session to avoid predictable/forgeable signatures.
+     */
+    function createJWT(payload) {
+      const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+      const body   = base64url(JSON.stringify(payload));
+      // Random nonce – not a real HMAC, but unpredictable within the session
+      const nonce  = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+        .map(b => b.toString(16).padStart(2, '0')).join('');
+      const sig    = base64url('demo-' + nonce);
+      return header + '.' + body + '.' + sig;
+    }
+
+    /**
+     * Decode the payload portion of a JWT using TextDecoder (no deprecated unescape()).
+     * Does NOT verify the signature – demo only.
+     */
+    function decodeJWT(token) {
+      try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        const binary = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
+        const bytes  = Uint8Array.from(binary, c => c.charCodeAt(0));
+        const json   = new TextDecoder().decode(bytes);
+        return JSON.parse(json);
+      } catch {
+        return null;
+      }
+    }
+
+    // ── Auth state ──
+    const SESSION_KEY = 'todo_jwt';
+
+    function saveSession(token) {
+      localStorage.setItem(SESSION_KEY, token);
+    }
+
+    function loadSession() {
+      return localStorage.getItem(SESSION_KEY);
+    }
+
+    function clearSession() {
+      localStorage.removeItem(SESSION_KEY);
+    }
+
+    // ── OAuth2 login simulation ──
+    function oauthLogin(provider) {
+      const providerNames = { google: 'Google User', github: 'GitHub User' };
+      const providerEmails = { google: 'user@gmail.com', github: 'user@github.com' };
+      const iat = nowUnix();
+      const payload = {
+        sub:      provider + '-user-001',
+        name:     providerNames[provider],
+        email:    providerEmails[provider],
+        provider: provider,
+        iat:      iat,
+        exp:      iat + 3600
+      };
+      const token = createJWT(payload);
+      saveSession(token);
+      showApp(payload, provider + ' OAuth2', token);
+    }
+
+    // ── Email / password login ──
+    function emailLogin(event) {
+      event.preventDefault();
+      const email    = document.getElementById('emailInput').value.trim();
+      const password = document.getElementById('passwordInput').value;
+      const errorEl  = document.getElementById('authError');
+      errorEl.textContent = '';
+
+      // Demo: accept any non-empty email + password with length >= 6
+      if (!email) {
+        errorEl.textContent = 'Email is required.';
+        return;
+      }
+      if (password.length < 6) {
+        errorEl.textContent = 'Password must be at least 6 characters.';
+        return;
+      }
+
+      const iat = nowUnix();
+      const payload = {
+        sub:      'email-' + email,
+        name:     email.split('@')[0],
+        email:    email,
+        provider: 'email',
+        iat:      iat,
+        exp:      iat + 3600
+      };
+      const token = createJWT(payload);
+      saveSession(token);
+      showApp(payload, 'Email / Password', token);
+    }
+
+    // ── Show the todo app ──
+    function showApp(payload, method, token) {
+      document.getElementById('authPanel').style.display = 'none';
+      document.getElementById('todoPanel').style.display = 'block';
+
+      // Avatar initial
+      const initial = (payload.name || payload.email || '?')[0].toUpperCase();
+      document.getElementById('userAvatar').textContent = initial;
+      document.getElementById('userName').textContent   = payload.name || payload.email;
+      document.getElementById('userBadge').textContent  = 'Signed in via ' + method;
+
+      // Token display
+      document.getElementById('tokenInfo').innerHTML =
+        '<strong>JWT Token (demo)</strong>' +
+        '<span title="' + token + '">' + token.substring(0, 60) + '…</span>';
+
+      document.getElementById('todoInput').focus();
+    }
+
+    // ── Logout ──
+    function logout() {
+      clearSession();
+      document.getElementById('todoPanel').style.display  = 'none';
+      document.getElementById('authPanel').style.display  = 'block';
+      document.getElementById('todoList').innerHTML = '';
+      document.getElementById('counter').textContent = '';
+      document.getElementById('loginForm').reset();
+      document.getElementById('authError').textContent = '';
+    }
+
+    // ── Todo logic ──
+    function updateCounter() {
+      const items = document.querySelectorAll('#todoList li');
+      const done  = document.querySelectorAll('#todoList li .todo-text.done').length;
+      const el    = document.getElementById('counter');
+      if (items.length === 0) {
+        el.textContent = '';
+      } else {
+        el.textContent = done + ' / ' + items.length + ' completed';
+      }
+    }
 
     function addTodo() {
-      const text = input.value.trim();
+      const input = document.getElementById('todoInput');
+      const text  = input.value.trim();
       if (!text) return;
 
-      const li = document.createElement('li');
+      const list = document.getElementById('todoList');
+      const li   = document.createElement('li');
 
       const span = document.createElement('span');
+      span.className = 'todo-text';
       span.textContent = text;
+      span.addEventListener('click', () => {
+        span.classList.toggle('done');
+        updateCounter();
+      });
 
       const deleteBtn = document.createElement('button');
       deleteBtn.textContent = 'Delete';
-      deleteBtn.addEventListener('click', () => li.remove());
+      deleteBtn.addEventListener('click', () => { li.remove(); updateCounter(); });
 
       li.appendChild(span);
       li.appendChild(deleteBtn);
@@ -137,6 +510,23 @@
     document.getElementById('todoInput').addEventListener('keydown', (e) => {
       if (e.key === 'Enter') addTodo();
     });
+
+    // ── On page load: restore session if valid JWT exists ──
+    (function init() {
+      const token = loadSession();
+      if (!token) return;
+      const payload = decodeJWT(token);
+      if (!payload) return;
+      // Check expiry
+      if (payload.exp && nowUnix() > payload.exp) {
+        clearSession();
+        return;
+      }
+      const method = payload.provider === 'email'
+        ? 'Email / Password'
+        : (payload.provider || 'OAuth2') + ' OAuth2';
+      showApp(payload, method, token);
+    })();
   </script>
 </body>
 </html>
