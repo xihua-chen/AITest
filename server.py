@@ -1,4 +1,5 @@
 import os
+import re
 import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -8,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from jose import jwt, JWTError
+from passlib.context import CryptContext
 from pydantic import BaseModel
 
 load_dotenv()
@@ -20,18 +22,40 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_HOURS = 24
 COOKIE_NAME = "auth_token"
 
+# Simplified email validation regex (handles the most common valid formats)
+EMAIL_REGEX = re.compile(
+    r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$"
+)
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 app = FastAPI()
 
 # --------------- In-memory stores ---------------
-users: dict[str, dict] = {}          # github_id -> {id, login, name, avatar_url}
-todos: dict[str, list[dict]] = {}    # github_id -> [{id, text, done}]
+users: dict[str, dict] = {}          # user_id -> {id, login, name, avatar_url}
+todos: dict[str, list[dict]] = {}    # user_id -> [{id, text, done}]
 oauth_states: dict[str, float] = {}  # state -> timestamp
+email_users: dict[str, dict] = {}    # email -> {id, email, name, password_hash}
+
+# --------------- Pydantic models ---------------
+
+class TodoCreate(BaseModel):
+    text: str
+
+
+class TodoUpdate(BaseModel):
+    done: bool
+
+
+class EmailLoginRequest(BaseModel):
+    email: str
+    password: str
 
 # --------------- Helpers ---------------
 
-def create_jwt(github_id: str) -> str:
+def create_jwt(user_id: str) -> str:
     payload = {
-        "sub": github_id,
+        "sub": user_id,
         "exp": datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_HOURS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
@@ -53,10 +77,10 @@ def get_current_user(request: Request) -> dict:
             token = auth[7:]
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    github_id = decode_jwt(token)
-    if not github_id or github_id not in users:
+    user_id = decode_jwt(token)
+    if not user_id or user_id not in users:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return users[github_id]
+    return users[user_id]
 
 
 # --------------- OAuth2 endpoints ---------------
@@ -141,6 +165,55 @@ async def logout():
     return response
 
 
+@app.post("/auth/email")
+async def auth_email(body: EmailLoginRequest):
+    """Authenticate (or register) a user with email + password."""
+    email = body.email.strip().lower()
+
+    if not EMAIL_REGEX.match(email):
+        raise HTTPException(status_code=400, detail="Invalid email address format.")
+
+    if len(body.password) < 6:
+        raise HTTPException(
+            status_code=400, detail="Password must be at least 6 characters."
+        )
+
+    password_hash = pwd_context.hash(body.password)
+
+    if email in email_users:
+        # Existing user – verify password
+        if not pwd_context.verify(body.password, email_users[email]["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password.")
+        user_id = email_users[email]["id"]
+    else:
+        # New user – register
+        user_id = "email-" + uuid.uuid4().hex[:8]
+        email_users[email] = {
+            "id": user_id,
+            "email": email,
+            "name": email.split("@")[0],
+            "password_hash": password_hash,
+        }
+        users[user_id] = {
+            "id": user_id,
+            "login": email,
+            "name": email.split("@")[0],
+            "avatar_url": "",
+        }
+        todos.setdefault(user_id, [])
+
+    token = create_jwt(user_id)
+    response = JSONResponse({"ok": True, "user": users[user_id]})
+    response.set_cookie(
+        COOKIE_NAME,
+        token,
+        httponly=True,
+        samesite="lax",
+        max_age=JWT_EXPIRY_HOURS * 3600,
+    )
+    return response
+
+
 # --------------- User info ---------------
 
 @app.get("/api/me")
@@ -149,10 +222,6 @@ async def me(user: dict = Depends(get_current_user)):
 
 
 # --------------- Todo API ---------------
-
-class TodoCreate(BaseModel):
-    text: str
-
 
 @app.get("/api/todos")
 async def list_todos(user: dict = Depends(get_current_user)):
@@ -175,6 +244,16 @@ async def delete_todo(todo_id: str, user: dict = Depends(get_current_user)):
         if t["id"] == todo_id:
             user_todos.pop(i)
             return {"ok": True}
+    raise HTTPException(status_code=404, detail="Todo not found")
+
+
+@app.patch("/api/todos/{todo_id}")
+async def update_todo(todo_id: str, body: TodoUpdate, user: dict = Depends(get_current_user)):
+    user_todos = todos.get(user["id"], [])
+    for t in user_todos:
+        if t["id"] == todo_id:
+            t["done"] = body.done
+            return t
     raise HTTPException(status_code=404, detail="Todo not found")
 
 
