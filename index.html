@@ -232,17 +232,16 @@
       margin-top: 8px;
     }
     .token-info {
-      background: #f5f3ff;
-      border: 1px solid #ede9fe;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
       border-radius: 8px;
       padding: 10px 14px;
-      font-size: 11px;
-      color: #6d28d9;
+      font-size: 12px;
+      color: #15803d;
       margin-top: 16px;
-      word-break: break-all;
       line-height: 1.6;
     }
-    .token-info strong { display: block; margin-bottom: 3px; color: #4f46e5; }
+    .token-info strong { display: block; margin-bottom: 3px; color: #166534; }
   </style>
 </head>
 <body>
@@ -312,95 +311,26 @@
     <ul id="todoList"></ul>
     <div class="counter" id="counter"></div>
 
-    <!-- JWT token display -->
+    <!-- Sync status -->
     <div class="token-info" id="tokenInfo"></div>
   </div>
 
   <script>
-    // ── Minimal JWT helpers (client-side DEMO only – NOT for production use) ──
-    // WARNING: This JWT implementation is for UI demonstration purposes only.
-    // The "signature" is not cryptographically secure. In a real application,
-    // tokens must be issued and verified by a trusted server using a secret key.
+    // ── Email validation regex (mirrors server-side EMAIL_REGEX) ──
+    const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
 
-    /** Returns the current Unix timestamp (seconds). */
-    function nowUnix() {
-      return Math.floor(Date.now() / 1000);
-    }
+    // Auto-sync every 30 seconds
+    const SYNC_INTERVAL_MS = 30000;
+    let syncTimer = null;
 
-    /**
-     * Base64url-encode a UTF-8 string using TextEncoder (no deprecated escape()).
-     */
-    function base64url(str) {
-      const bytes = new TextEncoder().encode(str);
-      let binary = '';
-      bytes.forEach(b => { binary += String.fromCharCode(b); });
-      return btoa(binary)
-        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    }
-
-    /**
-     * Create a demo JWT token.
-     * In a real app the server signs the token with a secret; here we use a
-     * random nonce per session to avoid predictable/forgeable signatures.
-     */
-    function createJWT(payload) {
-      const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
-      const body   = base64url(JSON.stringify(payload));
-      // Random nonce – not a real HMAC, but unpredictable within the session
-      const nonce  = Array.from(crypto.getRandomValues(new Uint8Array(16)))
-        .map(b => b.toString(16).padStart(2, '0')).join('');
-      const sig    = base64url('demo-' + nonce);
-      return header + '.' + body + '.' + sig;
-    }
-
-    /**
-     * Decode the payload portion of a JWT using TextDecoder (no deprecated unescape()).
-     * Does NOT verify the signature – demo only.
-     */
-    function decodeJWT(token) {
-      try {
-        const parts = token.split('.');
-        if (parts.length !== 3) return null;
-        const binary = atob(parts[1].replace(/-/g, '+').replace(/_/g, '/'));
-        const bytes  = Uint8Array.from(binary, c => c.charCodeAt(0));
-        const json   = new TextDecoder().decode(bytes);
-        return JSON.parse(json);
-      } catch {
-        return null;
-      }
-    }
-
-    // ── Auth state ──
-    const SESSION_KEY = 'todo_jwt';
-
-    function saveSession(token) {
-      localStorage.setItem(SESSION_KEY, token);
-    }
-
-    function loadSession() {
-      return localStorage.getItem(SESSION_KEY);
-    }
-
-    function clearSession() {
-      localStorage.removeItem(SESSION_KEY);
-    }
-
-    // ── OAuth2 login simulation ──
+    // ── OAuth2 login ──
     function oauthLogin(provider) {
-      const providerNames = { google: 'Google User', github: 'GitHub User' };
-      const providerEmails = { google: 'user@gmail.com', github: 'user@github.com' };
-      const iat = nowUnix();
-      const payload = {
-        sub:      provider + '-user-001',
-        name:     providerNames[provider],
-        email:    providerEmails[provider],
-        provider: provider,
-        iat:      iat,
-        exp:      iat + 3600
-      };
-      const token = createJWT(payload);
-      saveSession(token);
-      showApp(payload, provider + ' OAuth2', token);
+      if (provider === 'github') {
+        window.location.href = '/auth/github';
+      } else {
+        document.getElementById('authError').textContent =
+          'Google login is not configured. Please use GitHub OAuth2 or email.';
+      }
     }
 
     // ── Email / password login ──
@@ -411,9 +341,8 @@
       const errorEl  = document.getElementById('authError');
       errorEl.textContent = '';
 
-      // Demo: accept any non-empty email + password with length >= 6
-      if (!email) {
-        errorEl.textContent = 'Email is required.';
+      if (!email || !EMAIL_REGEX.test(email)) {
+        errorEl.textContent = 'Please enter a valid email address (e.g. user@example.com).';
         return;
       }
       if (password.length < 6) {
@@ -421,111 +350,170 @@
         return;
       }
 
-      const iat = nowUnix();
-      const payload = {
-        sub:      'email-' + email,
-        name:     email.split('@')[0],
-        email:    email,
-        provider: 'email',
-        iat:      iat,
-        exp:      iat + 3600
-      };
-      const token = createJWT(payload);
-      saveSession(token);
-      showApp(payload, 'Email / Password', token);
+      fetch('/auth/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      })
+        .then(r => r.json().then(data => ({ ok: r.ok, data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            errorEl.textContent = data.detail || 'Login failed.';
+            return;
+          }
+          showApp(data.user, 'Email / Password');
+          loadTodos();
+        })
+        .catch(() => {
+          errorEl.textContent = 'Network error. Please try again.';
+        });
     }
 
     // ── Show the todo app ──
-    function showApp(payload, method, token) {
+    function showApp(user, method) {
       document.getElementById('authPanel').style.display = 'none';
       document.getElementById('todoPanel').style.display = 'block';
 
-      // Avatar initial
-      const initial = (payload.name || payload.email || '?')[0].toUpperCase();
+      const initial = (user.name || user.login || '?')[0].toUpperCase();
       document.getElementById('userAvatar').textContent = initial;
-      document.getElementById('userName').textContent   = payload.name || payload.email;
+      document.getElementById('userName').textContent   = user.name || user.login;
       document.getElementById('userBadge').textContent  = 'Signed in via ' + method;
 
-      // Token display
-      document.getElementById('tokenInfo').innerHTML =
-        '<strong>JWT Token (demo)</strong>' +
-        '<span title="' + token + '">' + token.substring(0, 60) + '…</span>';
-
       document.getElementById('todoInput').focus();
+      startAutoSync();
     }
 
     // ── Logout ──
     function logout() {
-      clearSession();
-      document.getElementById('todoPanel').style.display  = 'none';
-      document.getElementById('authPanel').style.display  = 'block';
-      document.getElementById('todoList').innerHTML = '';
-      document.getElementById('counter').textContent = '';
-      document.getElementById('loginForm').reset();
-      document.getElementById('authError').textContent = '';
+      fetch('/auth/logout', { method: 'POST' })
+        .finally(() => {
+          stopAutoSync();
+          document.getElementById('todoPanel').style.display = 'none';
+          document.getElementById('authPanel').style.display = 'block';
+          document.getElementById('todoList').innerHTML = '';
+          document.getElementById('counter').textContent = '';
+          document.getElementById('tokenInfo').textContent = '';
+          document.getElementById('loginForm').reset();
+          document.getElementById('authError').textContent = '';
+        });
     }
 
-    // ── Todo logic ──
-    function updateCounter() {
-      const items = document.querySelectorAll('#todoList li');
-      const done  = document.querySelectorAll('#todoList li .todo-text.done').length;
-      const el    = document.getElementById('counter');
-      if (items.length === 0) {
-        el.textContent = '';
-      } else {
-        el.textContent = done + ' / ' + items.length + ' completed';
+    // ── Load todos from server (used for initial load and auto-sync) ──
+    function loadTodos() {
+      fetch('/api/todos')
+        .then(r => {
+          if (r.status === 401) throw new Error('session_expired');
+          if (!r.ok) throw new Error('server_error');
+          return r.json();
+        })
+        .then(items => {
+          const list = document.getElementById('todoList');
+          list.innerHTML = '';
+          items.forEach(item => renderTodoItem(item));
+          updateCounter();
+          updateSyncStatus();
+        })
+        .catch(err => {
+          if (err.message === 'session_expired') logout();
+          // On transient server/network errors, keep the current list and retry next cycle
+        });
+    }
+
+    // ── Auto-sync helpers ──
+    function startAutoSync() {
+      stopAutoSync();
+      syncTimer = setInterval(loadTodos, SYNC_INTERVAL_MS);
+    }
+
+    function stopAutoSync() {
+      if (syncTimer) { clearInterval(syncTimer); syncTimer = null; }
+    }
+
+    function updateSyncStatus() {
+      const el = document.getElementById('tokenInfo');
+      if (el) {
+        el.innerHTML = '<strong>Auto-sync</strong> Last synced: ' +
+          new Date().toLocaleTimeString();
       }
     }
 
+    // ── Render a single todo item ──
+    function renderTodoItem(item) {
+      const list = document.getElementById('todoList');
+      const li   = document.createElement('li');
+      li.dataset.id = item.id;
+
+      const span = document.createElement('span');
+      span.className = 'todo-text' + (item.done ? ' done' : '');
+      span.textContent = item.text;
+      span.addEventListener('click', () => {
+        const nowDone = !span.classList.contains('done');
+        span.classList.toggle('done');
+        updateCounter();
+        fetch('/api/todos/' + item.id, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ done: nowDone })
+        });
+      });
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', () => {
+        fetch('/api/todos/' + item.id, { method: 'DELETE' })
+          .then(r => { if (r.ok) { li.remove(); updateCounter(); } });
+      });
+
+      li.appendChild(span);
+      li.appendChild(deleteBtn);
+      list.appendChild(li);
+    }
+
+    // ── Add a todo ──
     function addTodo() {
       const input = document.getElementById('todoInput');
       const text  = input.value.trim();
       if (!text) return;
 
-      const list = document.getElementById('todoList');
-      const li   = document.createElement('li');
+      fetch('/api/todos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      })
+        .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+        .then(item => {
+          renderTodoItem(item);
+          input.value = '';
+          input.focus();
+          updateCounter();
+        });
+    }
 
-      const span = document.createElement('span');
-      span.className = 'todo-text';
-      span.textContent = text;
-      span.addEventListener('click', () => {
-        span.classList.toggle('done');
-        updateCounter();
-      });
-
-      const deleteBtn = document.createElement('button');
-      deleteBtn.textContent = 'Delete';
-      deleteBtn.addEventListener('click', () => { li.remove(); updateCounter(); });
-
-      li.appendChild(span);
-      li.appendChild(deleteBtn);
-      list.appendChild(li);
-
-      input.value = '';
-      input.focus();
-      updateCounter();
+    // ── Counter ──
+    function updateCounter() {
+      const items = document.querySelectorAll('#todoList li');
+      const done  = document.querySelectorAll('#todoList li .todo-text.done').length;
+      const el    = document.getElementById('counter');
+      el.textContent = items.length === 0 ? '' : done + ' / ' + items.length + ' completed';
     }
 
     document.getElementById('addBtn').addEventListener('click', addTodo);
-    document.getElementById('todoInput').addEventListener('keydown', (e) => {
+    document.getElementById('todoInput').addEventListener('keydown', e => {
       if (e.key === 'Enter') addTodo();
     });
 
-    // ── On page load: restore session if valid JWT exists ──
+    // ── On page load: check if already authenticated via server cookie ──
     (function init() {
-      const token = loadSession();
-      if (!token) return;
-      const payload = decodeJWT(token);
-      if (!payload) return;
-      // Check expiry
-      if (payload.exp && nowUnix() > payload.exp) {
-        clearSession();
-        return;
-      }
-      const method = payload.provider === 'email'
-        ? 'Email / Password'
-        : (payload.provider || 'OAuth2') + ' OAuth2';
-      showApp(payload, method, token);
+      fetch('/api/me')
+        .then(r => { if (!r.ok) return null; return r.json(); })
+        .then(user => {
+          if (!user) return;
+          const method = (user.login && user.login.includes('@'))
+            ? 'Email / Password'
+            : 'GitHub OAuth2';
+          showApp(user, method);
+          loadTodos();
+        });
     })();
   </script>
 </body>
