@@ -108,6 +108,83 @@ python server.py
 - `JWT_SECRET` 是否配置稳定
 - 浏览器是否拦截 Cookie
 
-## 10. 当前限制
+## 10. 部署注意点
+
+### 10.1 安全配置
+
+- **必须更换 `JWT_SECRET`**：使用 `python -c "import secrets; print(secrets.token_hex(32))"` 生成随机密钥，切勿使用默认值
+- **切勿将 `.env` 文件提交到 Git**：确保 `.gitignore` 中包含 `.env`
+- **生产环境启用 HTTPS**：JWT Cookie 应设置 `secure=True`，需在 `server.py` 中修改 `set_cookie` 调用
+- **GitHub OAuth App 回调地址**：生产环境需更新为实际域名（如 `https://yourdomain.com/auth/github/callback`）
+
+### 10.2 数据持久化
+
+- 当前为内存存储，**服务重启后数据丢失**
+- 生产部署建议接入数据库（PostgreSQL / SQLite），替换 `users`、`todos`、`email_users` 字典
+- 密码哈希使用 bcrypt，迁移数据库后可直接复用
+
+### 10.3 部署方式
+
+#### 直接运行
+
+```bash
+pip install -r requirements.txt
+uvicorn server:app --host 0.0.0.0 --port 8000 --workers 4
+```
+
+> 注意：多 worker 模式下内存存储不共享，必须先接入外部数据库
+
+#### Docker 部署
+
+```dockerfile
+FROM python:3.12-slim
+WORKDIR /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY . .
+EXPOSE 8000
+CMD ["uvicorn", "server:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```bash
+docker build -t todo-app .
+docker run -d -p 8000:8000 --env-file .env todo-app
+```
+
+### 10.4 反向代理（Nginx 示例）
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name yourdomain.com;
+
+    ssl_certificate     /path/to/cert.pem;
+    ssl_certificate_key /path/to/key.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### 10.5 环境变量清单
+
+| 变量 | 必填 | 说明 |
+|------|------|------|
+| `GITHUB_CLIENT_ID` | 是 | GitHub OAuth App Client ID |
+| `GITHUB_CLIENT_SECRET` | 是 | GitHub OAuth App Client Secret |
+| `JWT_SECRET` | 是 | JWT 签名密钥（生产环境必须自定义） |
+| `BASE_URL` | 否 | 应用根 URL，默认 `http://localhost:8000` |
+
+### 10.6 其他注意事项
+
+- CORS：当前未启用，如果前后端分离部署需添加 `CORSMiddleware`
+- 日志：建议生产环境配置 `uvicorn` 的 `--log-level info` 并接入日志收集
+- 监控：可通过 FastAPI 内置 `/docs` 端点验证 API 状态（生产环境建议关闭）
+
+## 11. 当前限制
 
 当前数据存储为内存级（重启服务后数据会丢失），适用于本地开发和演示环境。
